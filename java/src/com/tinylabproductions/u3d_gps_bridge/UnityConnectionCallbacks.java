@@ -35,4 +35,12 @@ public class UnityConnectionCallbacks implements ConnectionCallbacks {
 			String.format("%d", errorCode)
 		);
 	}
+
+	public void onAuthorizationSuccess(String authorizationCode) {
+		UnityPlayer.UnitySendMessage(unityGameObjectName, "onAuthorizationSuccess", authorizationCode);
+	}
+
+	public void onAuthorizationFailed() {
+		UnityPlayer.UnitySendMessage(unityGameObjectName, "onAuthorizationFailed", "");
+	}
 }

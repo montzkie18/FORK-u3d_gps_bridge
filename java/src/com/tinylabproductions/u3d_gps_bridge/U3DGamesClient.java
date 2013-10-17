@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Resources;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -129,40 +130,11 @@ public class U3DGamesClient {
     return client.getCurrentAccountName();
   }
 
-  public String getAuthorizationCode() {
-    Context context = activity.getApplicationContext();
-    Bundle appActivities = new Bundle();
-    appActivities.putString(GoogleAuthUtil.KEY_REQUEST_VISIBLE_ACTIVITIES, "");
-    List<String> scopes = Arrays.asList(new String[]{
-      "https://www.googleapis.com/auth/games",
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email"
-    });
-    String appId = getResourceString("app_id");
-    String clientId = String.format("%s.apps.googleusercontent.com", appId);
-    String scope = String.format("oauth2:server:client_id:%s:api_scope:%s", clientId, TextUtils.join(" ", scopes));
-    String code = "";
-    try {
-      code = GoogleAuthUtil.getToken(
-	            context,                          // Context context
-              client.getCurrentAccountName(),   // String accountName
-              scope,                            // String scope
-              appActivities                     // Bundle bundle
-      );
-    } catch (IOException transientEx) {
-      // network or server error, the call is expected to succeed if you try again later.
-      // Don't attempt to call again immediately - the request is likely to
-      // fail, you'll hit quotas or back-off.
-      Log.d(TAG, transientEx.getMessage());
-    } catch (UserRecoverableAuthException e) {
-      // Recover
-      Log.d(TAG, e.getMessage());
-	    activity.startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION);
-    } catch (Exception e) {
-      // fail silently
-      Log.d(TAG, e.getMessage());
-    }
-    return code;
+  public void getAuthorizationCode() {
+	  Intent authorizationIntent = new Intent(activity, AuthorizationActivity.class);
+	  authorizationIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+	  authorizationIntent.putExtra(StaticData.KEY, id);
+	  activity.startActivity(authorizationIntent);
   }
 
   public boolean isSupported() {
@@ -174,8 +146,7 @@ public class U3DGamesClient {
   }
 
   public boolean isServiceVersionUpdateRequired() {
-    return playServicesSupported ==
-      ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED;
+    return playServicesSupported == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED;
   }
 
   public boolean isServiceDisabled() {
@@ -252,21 +223,5 @@ public class U3DGamesClient {
       throw new IllegalStateException(
         "You need to be connected to perform this operation!"
       );
-  }
-
-    @SuppressLint("NewApi")
-  private String getResourceString(String name) {
-    Context context = activity.getApplicationContext();
-    int nameResourceID = 0;
-    if(context != null) {
-      ApplicationInfo appInfo = context.getApplicationInfo();
-      if(appInfo != null) {
-        nameResourceID = context.getResources().getIdentifier(name, "string", appInfo.packageName);
-      }
-    }
-    if (nameResourceID == 0) {
-      throw new IllegalArgumentException("No resource string found with name " + name);
-    }
-    return context.getString(nameResourceID);
   }
 }
