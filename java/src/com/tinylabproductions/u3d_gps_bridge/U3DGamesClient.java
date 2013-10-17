@@ -1,14 +1,27 @@
 package com.tinylabproductions.u3d_gps_bridge;
 
+import android.*;
+import android.R;
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.res.Resources;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
+import com.google.android.gms.auth.GoogleAuthUtil;
+import com.google.android.gms.auth.UserRecoverableAuthException;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.games.GamesClient;
 import com.unity3d.player.UnityPlayer;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 public class U3DGamesClient {
   public static final String TAG = "U3DGamesClient";
@@ -17,6 +30,7 @@ public class U3DGamesClient {
   // An arbitrary integer that you define as the request code.
   private static final int REQUEST_LEADERBOARD = 0;
   private static final int REQUEST_ACHIEVEMENTS = 1;
+	private static final int REQUEST_AUTHORIZATION = 10;
 
   private final int playServicesSupported;
   private final GamesClient client;
@@ -72,9 +86,9 @@ public class U3DGamesClient {
       }
     };
 
-  public U3DGamesClient(ConnectionCallbacks connectionCallbacks) {
+  public U3DGamesClient(String gameObjectName) {
     activity = UnityPlayer.currentActivity;
-    this.connectionCallbacks = connectionCallbacks;
+    this.connectionCallbacks = new UnityConnectionCallbacks(gameObjectName);
 
     playServicesSupported =
       GooglePlayServicesUtil.isGooglePlayServicesAvailable(activity);
@@ -105,6 +119,50 @@ public class U3DGamesClient {
   public void disconnect() {
     Log.d(TAG, "disconnect()");
     client.disconnect();
+  }
+
+  public String getAccountId() {
+    return client.getCurrentPlayerId();
+  }
+
+  public String getAccountName() {
+    return client.getCurrentAccountName();
+  }
+
+  public String getAuthorizationCode() {
+    Context context = activity.getApplicationContext();
+    Bundle appActivities = new Bundle();
+    appActivities.putString(GoogleAuthUtil.KEY_REQUEST_VISIBLE_ACTIVITIES, "");
+    List<String> scopes = Arrays.asList(new String[]{
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email"
+    });
+    String appId = getResourceString("app_id");
+    String clientId = String.format("%s.apps.googleusercontent.com", appId);
+    String scope = String.format("oauth2:server:client_id:%s:api_scope:%s", clientId, TextUtils.join(" ", scopes));
+    String code = "";
+    try {
+      code = GoogleAuthUtil.getToken(
+	            context,                          // Context context
+              client.getCurrentAccountName(),   // String accountName
+              scope,                            // String scope
+              appActivities                     // Bundle bundle
+      );
+    } catch (IOException transientEx) {
+      // network or server error, the call is expected to succeed if you try again later.
+      // Don't attempt to call again immediately - the request is likely to
+      // fail, you'll hit quotas or back-off.
+      Log.d(TAG, transientEx.getMessage());
+    } catch (UserRecoverableAuthException e) {
+      // Recover
+      Log.d(TAG, e.getMessage());
+	    activity.startActivityForResult(e.getIntent(), REQUEST_AUTHORIZATION);
+    } catch (Exception e) {
+      // fail silently
+      Log.d(TAG, e.getMessage());
+    }
+    return code;
   }
 
   public boolean isSupported() {
@@ -194,5 +252,21 @@ public class U3DGamesClient {
       throw new IllegalStateException(
         "You need to be connected to perform this operation!"
       );
+  }
+
+    @SuppressLint("NewApi")
+  private String getResourceString(String name) {
+    Context context = activity.getApplicationContext();
+    int nameResourceID = 0;
+    if(context != null) {
+      ApplicationInfo appInfo = context.getApplicationInfo();
+      if(appInfo != null) {
+        nameResourceID = context.getResources().getIdentifier(name, "string", appInfo.packageName);
+      }
+    }
+    if (nameResourceID == 0) {
+      throw new IllegalArgumentException("No resource string found with name " + name);
+    }
+    return context.getString(nameResourceID);
   }
 }
