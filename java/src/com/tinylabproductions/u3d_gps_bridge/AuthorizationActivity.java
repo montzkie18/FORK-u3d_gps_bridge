@@ -17,7 +17,6 @@ import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.GooglePlayServicesAvailabilityException;
 import com.google.android.gms.auth.UserRecoverableAuthException;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.unity3d.player.UnityPlayerActivity;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -28,34 +27,42 @@ import java.util.List;
  */
 public class AuthorizationActivity extends Activity {
 
-	private static final int REQUEST_AUTHORIZATION = 10;
+	public static final int REQUEST_AUTH_CODE = 10;
+	public static final int REQUEST_ID_TOKEN = 11;
 	private U3DGamesClient client;
+
+	private int requestType;
+	private String authCode;
+	private String idToken;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		retrieveIntentData();
-		getAndUseAuthTokenInAsyncTask();
+		getTokenInAsyncTask(requestType);
 	}
 
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
 		retrieveIntentData();
-		if(requestCode == REQUEST_AUTHORIZATION) {
-			if(resultCode == Activity.RESULT_OK) {
-				getAndUseAuthTokenInAsyncTask();
-			}else{
-				client.connectionCallbacks.onAuthorizationFailed();
-				finish();
-			}
+
+		if(resultCode != Activity.RESULT_OK) {
+			failRequest();
+			return;
 		}
+
+		// after permissions have been given by the user,
+		// try getting the same token again
+		getTokenInAsyncTask(requestCode);
 	}
 
 	private void retrieveIntentData() {
 		Intent intent = getIntent();
 		long key = intent.getLongExtra(StaticData.KEY, 0);
+		requestType = intent.getIntExtra(StaticData.TOKEN_TYPE, REQUEST_AUTH_CODE);
+
 		if (key == 0)
 			throw new IllegalStateException("Cannot get key from intent " + intent);
 
@@ -69,7 +76,17 @@ public class AuthorizationActivity extends Activity {
 		Log.d(U3DGamesClient.TAG, StaticData.asString());
 	}
 
-	private void getAndUseAuthTokenBlocking() {
+	private void receiveToken(String token, int requestCode) {
+		client.connectionCallbacks.onAuthorizationSuccess(token);
+		finish();
+	}
+
+	private void failRequest() {
+		client.connectionCallbacks.onAuthorizationFailed();
+		finish();
+	}
+
+	private void getAuthCode() {
 		Context context = getApplicationContext();
 		Bundle appActivities = new Bundle();
 		appActivities.putString(GoogleAuthUtil.KEY_REQUEST_VISIBLE_ACTIVITIES, "");
@@ -80,53 +97,67 @@ public class AuthorizationActivity extends Activity {
 		});
 		String appId = getResourceString("app_id");
 		String clientId = String.format("%s.apps.googleusercontent.com", appId);
-		String scope = String.format("oauth2:server:client_id:%s:api_scope:%s", clientId, TextUtils.join(" ", scopes));
+		String scope = String.format(
+				"oauth2:server:client_id:%s:api_scope:%s",
+				clientId,
+				TextUtils.join(" ", scopes)
+		);
+		getTokenBlocking(scope, appActivities, REQUEST_AUTH_CODE);
+	}
+
+	private void getIdToken() {
+		Context context = getApplicationContext();
+		String appId = getResourceString("app_id");
+		String clientId = String.format("%s.apps.googleusercontent.com", appId);
+		String scope = String.format("audience:server:client_id:%s",clientId);
+		getTokenBlocking(scope, null, REQUEST_ID_TOKEN);
+	}
+
+	private void getTokenBlocking(String scope, Bundle appActivities, int requestCode) {
+		Context context = getApplicationContext();
+		String accountName = client.getAccountName();
 
 		try {
 			// Retrieve a token for the given account and scope. It will always return either
 			// a non-empty String or throw an exception.
-			final String token = GoogleAuthUtil.getToken(
-					context,                          // Context context
-					client.getAccountName(),          // String accountName
-					scope,                            // String scope
-					appActivities                     // Bundle bundle
-			);
-			// Do work with token.
-			client.connectionCallbacks.onAuthorizationSuccess(token);
-			finish();
+			if(appActivities == null) {
+				final String token = GoogleAuthUtil.getToken(context, accountName, scope);
+				receiveToken(token, requestCode);
+			}else{
+				final String code = GoogleAuthUtil.getToken(context, accountName, scope, appActivities);
+				receiveToken(code, requestCode);
+			}
 		} catch (GooglePlayServicesAvailabilityException playEx) {
 			Dialog alert = GooglePlayServicesUtil.getErrorDialog(
 					playEx.getConnectionStatusCode(),
 					this,
-					REQUEST_AUTHORIZATION);
+					requestCode);
 			alert.show();
-			client.connectionCallbacks.onAuthorizationFailed();
-			finish();
+			failRequest();
 		} catch (UserRecoverableAuthException userAuthEx) {
 			// Start the user recoverable action using the intent returned by
 			// getIntent()
-			startActivityForResult(
-					userAuthEx.getIntent(),
-					REQUEST_AUTHORIZATION);
+			startActivityForResult(userAuthEx.getIntent(), requestCode);
 		} catch (IOException transientEx) {
 			// network or server error, the call is expected to succeed if you try again later.
 			// Don't attempt to call again immediately - the request is likely to
 			// fail, you'll hit quotas or back-off.
-			client.connectionCallbacks.onAuthorizationFailed();
-			finish();
-		} catch (GoogleAuthException authEx) {
-				// Failure. The call is not expected to ever succeed so it should not be
-				// retried.
-			client.connectionCallbacks.onAuthorizationFailed();
-			finish();
+			failRequest();
+		} catch(GoogleAuthException googleAuthEx) {
+			failRequest();
 		}
 	}
 
-	private void getAndUseAuthTokenInAsyncTask() {
+	private void getTokenInAsyncTask(final int requestCode) {
 		AsyncTask<Void, Void, Void> task = new AsyncTask<Void, Void, Void>() {
 			@Override
 			protected Void doInBackground(Void... params) {
-				getAndUseAuthTokenBlocking();
+				switch (requestCode) {
+					case REQUEST_AUTH_CODE:
+						getAuthCode(); break;
+					case REQUEST_ID_TOKEN:
+						getIdToken(); break;
+				}
 				return (Void)null;
 			}
 		};

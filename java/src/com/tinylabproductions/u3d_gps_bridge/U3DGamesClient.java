@@ -130,10 +130,19 @@ public class U3DGamesClient {
     return client.getCurrentAccountName();
   }
 
+	public void getIdToken() {
+		Intent authorizationIntent = new Intent(activity, AuthorizationActivity.class);
+		authorizationIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+		authorizationIntent.putExtra(StaticData.KEY, id);
+		authorizationIntent.putExtra(StaticData.TOKEN_TYPE, AuthorizationActivity.REQUEST_ID_TOKEN);
+		activity.startActivity(authorizationIntent);
+	}
+
   public void getAuthorizationCode() {
 	  Intent authorizationIntent = new Intent(activity, AuthorizationActivity.class);
 	  authorizationIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
 	  authorizationIntent.putExtra(StaticData.KEY, id);
+	  authorizationIntent.putExtra(StaticData.TOKEN_TYPE, AuthorizationActivity.REQUEST_AUTH_CODE);
 	  activity.startActivity(authorizationIntent);
   }
 

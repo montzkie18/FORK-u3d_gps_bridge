@@ -8,6 +8,7 @@ import java.util.Map;
 // Class for passing data between activities.
 public class StaticData {
   public static final String KEY = "KEY";
+	public static final String TOKEN_TYPE = "TOKEN_TYPE";
 
   public static Map<Long, ConnectionResult> results =
     new HashMap<Long, ConnectionResult>();
