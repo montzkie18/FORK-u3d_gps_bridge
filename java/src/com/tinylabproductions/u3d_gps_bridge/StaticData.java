@@ -9,6 +9,7 @@ import java.util.Map;
 public class StaticData {
   public static final String KEY = "KEY";
 	public static final String TOKEN_TYPE = "TOKEN_TYPE";
+	public static final String LEADERBOARD_ID = "LEADERBOARD_ID";
 
   public static Map<Long, ConnectionResult> results =
     new HashMap<Long, ConnectionResult>();

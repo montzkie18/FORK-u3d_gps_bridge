@@ -184,6 +184,14 @@ public class U3DGamesClient {
     client.unlockAchievement(achievementId);
   }
 
+	public Intent getAchievementsIntent() {
+		return client.getAchievementsIntent();
+	}
+
+	public Intent getLeaderboardIntent(String leaderboardId) {
+		return client.getLeaderboardIntent(leaderboardId);
+	}
+
   public boolean showAchievements() {
     if (! tryConnectivity()) {
       Log.i(TAG, String.format(
@@ -194,10 +202,11 @@ public class U3DGamesClient {
     }
 
     Log.d(TAG, "Showing achievements.");
-    activity.startActivityForResult(
-      client.getAchievementsIntent(),
-      REQUEST_ACHIEVEMENTS
-    );
+	  Intent achievementIntent = new Intent(activity, GameBoardActivity.class);
+	  achievementIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+	  achievementIntent.putExtra(StaticData.KEY, id);
+	  achievementIntent.putExtra(StaticData.TOKEN_TYPE, GameBoardActivity.REQUEST_ACHIEVEMENTS);
+	  activity.startActivity(achievementIntent);
     return true;
   }
 
@@ -211,10 +220,12 @@ public class U3DGamesClient {
     }
 
     Log.d(TAG, "Starting activity to show leaderboard " + leaderboardId);
-    activity.startActivityForResult(
-      client.getLeaderboardIntent(leaderboardId),
-      REQUEST_LEADERBOARD
-    );
+	  Intent leaderboardIntent = new Intent(activity, GameBoardActivity.class);
+	  leaderboardIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+	  leaderboardIntent.putExtra(StaticData.KEY, id);
+	  leaderboardIntent.putExtra(StaticData.TOKEN_TYPE, GameBoardActivity.REQUEST_ACHIEVEMENTS);
+	  leaderboardIntent.putExtra(StaticData.LEADERBOARD_ID, leaderboardId);
+	  activity.startActivity(leaderboardIntent);
     return true;
   }
 
